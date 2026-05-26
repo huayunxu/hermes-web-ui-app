@@ -47,7 +47,7 @@ jobs:
         run: |
           if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
             yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" 2>&1 | tail -5
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" 2>&1 | tail -5
           else
             echo "WARNING: ANDROID_HOME not set, checking common paths..."
             ls /usr/local/lib/android/sdk 2>/dev/null || true
