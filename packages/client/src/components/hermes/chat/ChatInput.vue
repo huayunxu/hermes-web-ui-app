@@ -29,7 +29,6 @@ const {
   isListening,
   transcript: recognitionTranscript,
   interim: recognitionInterim,
-  errorMessage: recognitionError,
   isSupported: isSttSupported,
   toggle: toggleStt,
   reset: resetStt,
