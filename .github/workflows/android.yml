@@ -47,24 +47,22 @@ jobs:
         run: |
           if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
             yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" 2>&1 | tail -5
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.31.7" 2>&1 | tail -10
           else
             echo "WARNING: ANDROID_HOME not set, checking common paths..."
             ls /usr/local/lib/android/sdk 2>/dev/null || true
             find / -name "sdkmanager" 2>/dev/null | head -3
           fi
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.10.2"
-
       - name: Build debug APK
         shell: bash
         working-directory: ./android
         run: |
+          export ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          export ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
           set -o pipefail
           chmod +x gradlew
+          export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx2048m"
           ./gradlew assembleDebug --stacktrace --console=plain 2>&1 | tee ../build-log.txt
 
       - name: Upload debug APK (artifact)
