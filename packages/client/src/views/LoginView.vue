@@ -2,15 +2,20 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { setApiKey, hasApiKey } from "@/api/client";
+import { setApiKey, hasApiKey, setServerUrl } from "@/api/client";
 import { fetchAuthStatus, loginWithPassword } from "@/api/auth";
+import { checkDualAddresses } from "@/api/connection-check";
+import { useServerAddressStore } from "@/stores/hermes/server-address";
 
 const { t } = useI18n();
 const router = useRouter();
+const store = useServerAddressStore();
 
 const username = ref("");
 const password = ref("");
 const loading = ref(false);
+const addressChecking = ref(false);
+const checkingStatus = ref("");
 const errorMsg = ref("");
 const showLockResetHint = ref(false);
 
@@ -20,6 +25,12 @@ if (hasApiKey()) {
 }
 
 onMounted(async () => {
+  // Populate saved addresses from store
+  const saved = store.getDefaultBase()
+  if (!store.lanAddress && !store.wanAddress && saved) {
+    store.lanAddress = saved;
+  }
+
   try {
     await fetchAuthStatus();
   } catch {
@@ -28,22 +39,50 @@ onMounted(async () => {
 });
 
 async function handleLogin() {
-  await handlePasswordLogin();
-}
+  // Validate: at least one address required
+  if (!store.lanAddress.trim() && !store.wanAddress.trim()) {
+    errorMsg.value = t("login.addressRequired");
+    return;
+  }
 
-async function handlePasswordLogin() {
+  // Validate credentials
   if (!username.value.trim() || !password.value) {
     errorMsg.value = t("login.credentialsRequired");
     return;
   }
 
   loading.value = true;
+  addressChecking.value = true;
   errorMsg.value = "";
   showLockResetHint.value = false;
+  checkingStatus.value = t("login.addressChecking");
 
   try {
+    // Step 1: detect reachable address (LAN first, WAN fallback)
+    const checkResult = await checkDualAddresses(
+      store.lanAddress.trim(),
+      store.wanAddress.trim(),
+    );
+
+    if (checkResult.selectedBaseUrl) {
+      // Address is reachable — set as base URL
+      setServerUrl(checkResult.selectedBaseUrl);
+      store.setLastSuccessful(checkResult.selectedBaseUrl);
+
+      checkingStatus.value = t("login.addressReachable", { addr: checkResult.selectedBaseUrl });
+    } else {
+      // Neither is reachable
+      addressChecking.value = false;
+      loading.value = false;
+      errorMsg.value = t("login.allAddressesUnreachable");
+      return;
+    }
+
+    // Step 2: proceed with password login using the chosen base URL
     const sessionToken = await loginWithPassword(username.value.trim(), password.value);
     setApiKey(sessionToken);
+    store.lanAddress = store.lanAddress.trim()
+    store.wanAddress = store.wanAddress.trim()
     router.replace("/hermes/chat");
   } catch (err: any) {
     if (err.status === 429 || err.status === 503) {
@@ -54,6 +93,8 @@ async function handlePasswordLogin() {
     }
   } finally {
     loading.value = false;
+    addressChecking.value = false;
+    checkingStatus.value = "";
   }
 }
 </script>
@@ -69,6 +110,24 @@ async function handlePasswordLogin() {
       <p class="login-default-hint">{{ t("login.defaultCredentialsHint") }}</p>
 
       <form class="login-form" @submit.prevent="handleLogin">
+        <!-- LAN Address -->
+        <input
+          v-model="store.lanAddress"
+          type="url"
+          class="login-input"
+          :placeholder="t('login.lanAddressPlaceholder')"
+          :title="t('login.lanAddressLabel')"
+        />
+
+        <!-- WAN Address -->
+        <input
+          v-model="store.wanAddress"
+          type="url"
+          class="login-input"
+          :placeholder="t('login.wanAddressPlaceholder')"
+          :title="t('login.wanAddressLabel')"
+        />
+
         <input
           v-model="username"
           type="text"
@@ -84,6 +143,10 @@ async function handlePasswordLogin() {
           @keyup.enter="handleLogin"
         />
 
+        <div v-if="checkingStatus && addressChecking" class="login-checking">
+          {{ checkingStatus }}
+        </div>
+
         <div v-if="errorMsg" class="login-error">{{ errorMsg }}</div>
         <div v-if="showLockResetHint" class="login-lock-hint">
           <span>{{ t("login.lockResetHint") }}</span>
@@ -91,8 +154,8 @@ async function handlePasswordLogin() {
           <span>{{ t("login.defaultLoginResetHint") }}</span>
           <code>hermes-web-ui reset-default-login</code>
         </div>
-        <button type="submit" class="login-btn" :disabled="loading">
-          {{ loading ? "..." : t("login.submit") }}
+        <button type="submit" class="login-btn" :disabled="loading || addressChecking">
+          {{ loading || addressChecking ? "..." : t("login.submit") }}
         </button>
       </form>
     </div>
@@ -175,6 +238,18 @@ async function handlePasswordLogin() {
   &:focus {
     border-color: $accent-primary;
   }
+}
+
+.login-checking {
+  font-size: 13px;
+  color: $text-secondary;
+  text-align: left;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .login-error {

@@ -56,6 +56,9 @@
     "dist/"
   ],
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@vscode/markdown-it-katex": "^1.1.2",
     "eventsource": "^4.1.0",
     "js-tiktoken": "^1.0.21",
