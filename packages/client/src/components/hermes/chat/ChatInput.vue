@@ -9,6 +9,7 @@ import { NButton, NTooltip, NSwitch, NModal, NInputNumber, useMessage } from 'na
 import { computed, ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToolTraceVisibility } from '@/composables/useToolTraceVisibility'
+import { useSpeechRecognition } from '@/composables/useSpeechRecognition'
 
 const chatStore = useChatStore()
 const { t } = useI18n()
@@ -22,6 +23,45 @@ const attachments = ref<Attachment[]>([])
 const isDragging = ref(false)
 const dragCounter = ref(0)
 const isComposing = ref(false)
+
+// Speech recognition (STT)
+const {
+  isListening,
+  transcript: recognitionTranscript,
+  interim: recognitionInterim,
+  errorMessage: recognitionError,
+  isSupported: isSttSupported,
+  toggle: toggleStt,
+  reset: resetStt,
+} = useSpeechRecognition()
+
+// Merge recognition transcript + interim into inputText for live display
+watch([recognitionTranscript, recognitionInterim], ([transcript, interim]) => {
+  if (isListening.value) {
+    inputText.value = transcript + interim
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.style.height = 'auto'
+        textareaRef.value.style.height = Math.min(textareaRef.value.scrollHeight, 400) + 'px'
+      }
+    })
+  }
+})
+
+function handleVoiceInputToggle() {
+  if (!isSttSupported.value) {
+    message.warning(t('chat.voiceInputNotSupported'))
+    return
+  }
+  if (isListening.value) {
+    // Stop: copy final transcript into inputText
+    inputText.value = recognitionTranscript.value
+    toggleStt()
+  } else {
+    resetStt()
+    toggleStt()
+  }
+}
 
 const bridgeCommands = computed(() => [
   { name: 'usage', args: '', description: t('chat.slashCommands.usage') },
@@ -567,6 +607,40 @@ function isImage(type: string): boolean {
         </div>
       </Transition>
       <div class="input-actions">
+        <!-- Voice input (microphone) button -->
+        <NTooltip trigger="hover" :disabled="isListening">
+          <template #trigger>
+            <NButton
+              size="small"
+              quaternary
+              circle
+              class="voice-input-btn"
+              :class="{ listening: isListening, 'not-supported': !isSttSupported }"
+              :disabled="!isSttSupported && !isListening"
+              :aria-label="isListening ? t('chat.voiceInputListening') : t('chat.voiceInput')"
+              @click="handleVoiceInputToggle"
+            >
+              <!-- Pulsing dot when listening -->
+              <template v-if="isListening" #icon>
+                <span class="voice-pulse">
+                  <span class="voice-pulse-ring"></span>
+                  <span class="voice-pulse-dot"></span>
+                </span>
+              </template>
+              <!-- Microphone icon when idle -->
+              <template v-else #icon>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              </template>
+            </NButton>
+          </template>
+          {{ isListening ? t('chat.voiceInputListening') : t('chat.voiceInput') }}
+        </NTooltip>
+
         <NButton
           v-if="chatStore.isStreaming"
           size="small"
