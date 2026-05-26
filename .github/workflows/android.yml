@@ -1,0 +1,105 @@
+name: Android APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "23"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web UI
+        run: npm run build
+
+      - name: Sync to Android
+        run: npx cap sync android
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android packages
+        shell: bash
+        run: |
+          if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || true
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" 2>&1 | tail -5
+          else
+            echo "WARNING: ANDROID_HOME not set, checking common paths..."
+            ls /usr/local/lib/android/sdk 2>/dev/null || true
+            find / -name "sdkmanager" 2>/dev/null | head -3
+          fi
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Build debug APK
+        shell: bash
+        working-directory: ./android
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace --console=plain 2>&1 | tee ../build-log.txt
+
+      - name: Upload debug APK (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-web-ui-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 5
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-web-ui-build-log
+          path: build-log.txt
+          retention-days: 5
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Build #${{ github.run_number }}"
+          body: |
+            ## Hermes Web UI - Build #${{ github.run_number }}
+
+            Auto-generated release for commit `${{ github.sha }}`.
+
+            ### Downloads
+            - [hermes-web-ui-debug.apk](${{ github.server_url }}/${{ github.repository }}/releases/download/build-${{ github.run_number }}/hermes-web-ui-debug.apk)
+
+            ### Info
+            - Commit: `${{ github.sha }}`
+            - Author: ${{ github.event.head_commit.author.name || 'Auto build' }}
+            - Trigger: ${{ github.event_name }}
+          files: |
+            android/app/build/outputs/apk/debug/*.apk
