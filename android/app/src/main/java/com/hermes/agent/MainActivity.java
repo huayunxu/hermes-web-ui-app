@@ -83,7 +83,7 @@ public class MainActivity extends BridgeActivity {
         // Setup WebView with WebChromeClient for permission handling
         // This is needed for Web Speech API (STT) to work on Android
         try {
-            WebView webView = findViewById(com.getcapacitor.R.id.webview);
+            WebView webView = getBridge().getWebView();
             if (webView != null) {
                 webView.setWebChromeClient(new WebChromeClient() {
                     @Override
