@@ -10,7 +10,7 @@ export async function checkAddressReachable(
 
   // Normalize: strip trailing slash
   const base = address.replace(/\/+$/, '')
-  const healthUrl = `${base}/api/health`
+  const healthUrl = `${base}/api/auth/status`
 
   try {
     const controller = new AbortController()
