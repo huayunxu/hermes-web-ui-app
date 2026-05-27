@@ -200,7 +200,6 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void downloadApk(String downloadUrl) {
-        File apkFile = null;
         try {
             URL url = new URL(downloadUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -226,7 +225,7 @@ public class MainActivity extends BridgeActivity {
             }
 
             // Save to cache dir (FileProvider accessible)
-            apkFile = new File(getCacheDir(), APK_ASSET_NAME);
+            final File apkFile = new File(getCacheDir(), APK_ASSET_NAME);
             long downloadedBytes = 0;
 
             try (InputStream in = conn.getInputStream();
