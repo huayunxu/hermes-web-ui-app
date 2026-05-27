@@ -92,29 +92,43 @@ html, body, #app {
 
 body {
   font-family: $font-ui;
+  font-size: 14px;
+  line-height: 1.6;
   background-color: $bg-primary;
   color: $text-primary;
-  
+
   /* Android WebView text visibility fix */
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Ensure message content is always visible */
-.conversation-monitor__message-content,
-.message-content,
-.msg-content {
-  color: var(--text-primary, #1a1a1a) !important;
+/* Capacitor / Android WebView: force text visibility on message content.
+   Scoped styles and v-html can fail to cascade in some WebView versions,
+   so we use global selectors with !important as a safety net. */
+.message-bubble,
+.msg-content,
+.markdown-body,
+.markdown-body p,
+.markdown-body li,
+.markdown-body span,
+.markdown-body div {
+  color: inherit !important;
   opacity: 1 !important;
   visibility: visible !important;
+  -webkit-text-fill-color: initial !important;
 }
 
-/* Dark mode override */
-.dark .conversation-monitor__message-content,
-.dark .message-content,
-.dark .msg-content {
+/* Explicit dark mode: ensure light text on dark backgrounds */
+.dark .message-bubble,
+.dark .msg-content,
+.dark .markdown-body,
+.dark .markdown-body p,
+.dark .markdown-body li,
+.dark .markdown-body span,
+.dark .markdown-body div {
   color: var(--text-primary, #f0f0f0) !important;
+  -webkit-text-fill-color: var(--text-primary, #f0f0f0) !important;
 }
 
 

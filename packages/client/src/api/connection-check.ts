@@ -10,7 +10,11 @@ export async function checkAddressReachable(
 
   // Normalize: strip trailing slash
   const base = address.replace(/\/+$/, '')
-  const healthPaths = ['/api/health', '/health']
+
+  // Use /api/auth/status as primary — it's public (no auth required) and always returns 200.
+  // /api/health requires auth (returns 401) so it's unreliable for pre-login checks.
+  // /health is the fallback for older server versions.
+  const healthPaths = ['/api/auth/status', '/health']
 
   for (const path of healthPaths) {
     try {
@@ -18,7 +22,7 @@ export async function checkAddressReachable(
       const timer = setTimeout(() => controller.abort(), timeoutMs)
 
       const res = await fetch(`${base}${path}`, {
-        method: 'GET',
+        method: 'HEAD',
         signal: controller.signal,
         // Avoid CORS preflight by keeping it simple
         mode: 'cors',
@@ -27,7 +31,8 @@ export async function checkAddressReachable(
 
       clearTimeout(timer)
 
-      if (res.ok) {
+      // Any response (even 4xx/5xx) means the server is reachable
+      if (res) {
         return base
       }
     } catch {
