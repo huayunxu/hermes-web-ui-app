@@ -26,6 +26,7 @@ import MessageList from "./MessageList.vue";
 import SessionListItem from "./SessionListItem.vue";
 import DrawerPanel from "./DrawerPanel.vue";
 import OutlinePanel from "./OutlinePanel.vue";
+import VoiceCallPanel from "./VoiceCallPanel.vue";
 
 const chatStore = useChatStore();
 const appStore = useAppStore();
@@ -38,6 +39,7 @@ const { t } = useI18n();
 const showDrawer = ref(false);
 const drawerActiveTab = ref<"terminal" | "files">("files");
 const showOutline = ref(false);
+const showVoiceCall = ref(false);
 
 const currentMode = ref<"chat" | "live">("chat");
 
@@ -1132,6 +1134,34 @@ async function handleSessionModelCustomSubmit() {
                 <NButton
                   quaternary
                   size="small"
+                  @click="showVoiceCall = true"
+                  circle
+                >
+                  <template #icon>
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <path d="M12 19v3" />
+                    </svg>
+                  </template>
+                </NButton>
+              </template>
+              语音通话
+            </NTooltip>
+            <NTooltip trigger="hover">
+              <template #trigger>
+                <NButton
+                  quaternary
+                  size="small"
                   @click="showOutline = !showOutline"
                   circle
                 >
@@ -1327,6 +1357,7 @@ async function handleSessionModelCustomSubmit() {
         v-else
         :human-only="sessionBrowserPrefsStore.humanOnly"
       />
+      <VoiceCallPanel v-if="showVoiceCall" @close="showVoiceCall = false" />
     </div>
 
     <!-- Floating drawer button -->
