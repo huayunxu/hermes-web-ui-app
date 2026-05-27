@@ -27,6 +27,7 @@ import SessionListItem from "./SessionListItem.vue";
 import DrawerPanel from "./DrawerPanel.vue";
 import OutlinePanel from "./OutlinePanel.vue";
 import VoiceCallPanel from "./VoiceCallPanel.vue";
+import VideoCallPanel from "./VideoCallPanel.vue";
 
 const chatStore = useChatStore();
 const appStore = useAppStore();
@@ -40,6 +41,7 @@ const showDrawer = ref(false);
 const drawerActiveTab = ref<"terminal" | "files">("files");
 const showOutline = ref(false);
 const showVoiceCall = ref(false);
+const showVideoCall = ref(false);
 
 const currentMode = ref<"chat" | "live">("chat");
 
@@ -1162,6 +1164,35 @@ async function handleSessionModelCustomSubmit() {
                 <NButton
                   quaternary
                   size="small"
+                  @click="showVideoCall = true"
+                  circle
+                >
+                  <template #icon>
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"
+                      />
+                      <circle cx="12" cy="13" r="3" />
+                    </svg>
+                  </template>
+                </NButton>
+              </template>
+              视频通话
+            </NTooltip>
+            <NTooltip trigger="hover">
+              <template #trigger>
+                <NButton
+                  quaternary
+                  size="small"
                   @click="showOutline = !showOutline"
                   circle
                 >
@@ -1358,6 +1389,7 @@ async function handleSessionModelCustomSubmit() {
         :human-only="sessionBrowserPrefsStore.humanOnly"
       />
       <VoiceCallPanel v-if="showVoiceCall" @close="showVoiceCall = false" />
+      <VideoCallPanel v-if="showVideoCall" @close="showVideoCall = false" />
     </div>
 
     <!-- Floating drawer button -->
