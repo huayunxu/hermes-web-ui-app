@@ -16,6 +16,15 @@ const toast = useMessage()
 const speech = useGlobalSpeech()
 const recognition = useSpeechRecognition('zh-CN')
 
+// Show toast on STT errors
+recognition.onError((errMsg, code) => {
+  console.error('[VoiceCall] STT error:', code, errMsg)
+  toast.error(`语音识别错误: ${errMsg}`)
+  if (code === 'not-allowed') {
+    callState.value = 'unsupported'
+  }
+})
+
 const callActive = ref(false)
 const callState = ref<CallState>('paused')
 const lastSentTranscriptLength = ref(0)
@@ -47,13 +56,24 @@ function clearTimers() {
 }
 
 function startListening() {
-  if (!canListen.value) return
+  if (!canListen.value) {
+    if (!recognition.isSupported.value) {
+      toast.error('当前环境不支持语音识别，请检查浏览器或WebView版本')
+      callState.value = 'unsupported'
+    }
+    return
+  }
   if (chatStore.isRunActive || speech.isPlaying.value || speech.isCustomPlaying.value) return
   recognition.reset()
   lastSentTranscriptLength.value = 0
   liveCaption.value = ''
-  recognition.start('zh-CN')
-  callState.value = 'listening'
+  try {
+    recognition.start('zh-CN')
+    callState.value = 'listening'
+  } catch (err: any) {
+    console.error('[VoiceCall] Failed to start STT:', err)
+    toast.error(`语音识别启动失败: ${err.message || '未知错误'}`)
+  }
 }
 
 function stopListening() {

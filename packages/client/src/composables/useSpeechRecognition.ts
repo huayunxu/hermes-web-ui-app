@@ -14,6 +14,8 @@ export interface SpeechRecognitionOptions {
  * Uses `webkitSpeechRecognition` which works in Chrome, Edge,
  * and Android Chrome WebView (Capacitor).
  */
+export type SttErrorCallback = (error: string, code: string) => void
+
 export function useSpeechRecognition(defaultLang = 'zh-CN') {
   const state = ref<RecognitionState>('idle')
   const transcript = ref('')
@@ -23,13 +25,24 @@ export function useSpeechRecognition(defaultLang = 'zh-CN') {
 
   let recognition: SpeechRecognition | null = null
   let recognitionCleanup: (() => void) | null = null
+  let onErrorCallback: SttErrorCallback | null = null
 
   const isSupported = computed(() => {
-    return !!(
+    const hasApi = !!(
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition
     )
+    // On Capacitor/Android, also check if we're in a secure context
+    if (hasApi && !window.isSecureContext) {
+      console.warn('[STT] SpeechRecognition API exists but not in secure context')
+      return false
+    }
+    return hasApi
   })
+
+  function onError(cb: SttErrorCallback) {
+    onErrorCallback = cb
+  }
 
   const isListening = computed(() => state.value === 'listening')
 
@@ -88,6 +101,7 @@ export function useSpeechRecognition(defaultLang = 'zh-CN') {
       }
 
       recognition.onerror = (event: any) => {
+        console.warn('[STT] Error:', event.error, event.message)
         // Ignore 'no-speech' — user might just be quiet; don't show as error UI
         if (event.error === 'no-speech') {
           recognition?.stop()
@@ -118,6 +132,8 @@ export function useSpeechRecognition(defaultLang = 'zh-CN') {
         } else {
           errorMessage.value = `Recognition error: ${event.error}`
         }
+        // Notify UI callback
+        onErrorCallback?.(errorMessage.value, event.error)
       }
 
       recognition.onend = () => {
@@ -198,5 +214,6 @@ export function useSpeechRecognition(defaultLang = 'zh-CN') {
     toggle,
     reset,
     destroy,
+    onError,
   }
 }

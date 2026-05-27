@@ -32,7 +32,14 @@ const {
   isSupported: isSttSupported,
   toggle: toggleStt,
   reset: resetStt,
+  onError: onSttError,
 } = useSpeechRecognition()
+
+// Show toast on STT errors
+onSttError((errMsg, code) => {
+  console.error('[STT] Error callback:', code, errMsg)
+  message.error(`语音识别错误: ${errMsg}`)
+})
 
 // Merge recognition transcript + interim into inputText for live display
 watch([recognitionTranscript, recognitionInterim], ([transcript, interim]) => {
@@ -57,8 +64,19 @@ function handleVoiceInputToggle() {
     inputText.value = recognitionTranscript.value
     toggleStt()
   } else {
-    resetStt()
-    toggleStt()
+    try {
+      resetStt()
+      toggleStt()
+      // Check if STT actually started after a short delay
+      setTimeout(() => {
+        if (!isListening.value) {
+          message.error('语音识别启动失败，请检查麦克风权限')
+        }
+      }, 500)
+    } catch (err: any) {
+      console.error('[STT] Toggle failed:', err)
+      message.error(`语音识别错误: ${err.message || '未知错误'}`)
+    }
   }
 }
 

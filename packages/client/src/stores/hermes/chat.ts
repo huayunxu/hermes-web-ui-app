@@ -1560,6 +1560,7 @@ export const useChatStore = defineStore('chat', () => {
         runPayload,
         // onEvent
         (evt: RunEvent) => {
+          console.log('[ChatStore] Run event:', evt.event, 'session:', sid)
           switch (evt.event) {
             case 'run.started':
               clearAgentEventMessages(sid)
@@ -1700,6 +1701,7 @@ export const useChatStore = defineStore('chat', () => {
             }
 
             case 'message.delta': {
+              console.log('[ChatStore] message.delta received, length:', evt.delta?.length || 0)
               if (evt.delta) runProducedAssistantText = true
               const msgs = getSessionMsgs(sid)
               const last = activeAssistantMessageId
@@ -1819,6 +1821,7 @@ export const useChatStore = defineStore('chat', () => {
             }
 
             case 'run.completed': {
+              console.log('[ChatStore] run.completed, session:', sid)
               clearAgentEventMessages(sid)
               const msgs = getSessionMsgs(sid)
               const lastMsg = activeAssistantMessageId
@@ -1924,6 +1927,7 @@ export const useChatStore = defineStore('chat', () => {
             }
 
             case 'run.failed': {
+              console.error('[ChatStore] run.failed:', evt.error, 'session:', sid)
               clearAgentEventMessages(sid)
               if ((evt as any).inputTokens != null) {
                 const target = sessions.value.find(s => s.id === sid)

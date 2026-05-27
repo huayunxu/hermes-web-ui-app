@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.getcapacitor.BridgeActivity;
+import android.webkit.WebView;
 
 import org.json.JSONObject;
 
@@ -58,6 +59,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Enable WebView debugging for Chrome DevTools
+        WebView.setWebContentsDebuggingEnabled(true);
         // Check for updates after the app has started
         executor.execute(this::checkForUpdates);
     }

@@ -566,6 +566,20 @@ export function connectChatRun(requestedProfile?: string | null): Socket {
     timeout: 30000,
   })
 
+  // Debug logging for Capacitor/mobile troubleshooting
+  chatRunSocket.on('connect', () => {
+    console.log('[ChatRun] Connected, id:', chatRunSocket?.id, 'transport:', chatRunSocket?.io?.engine?.transport?.name)
+  })
+  chatRunSocket.on('disconnect', (reason) => {
+    console.warn('[ChatRun] Disconnected:', reason)
+  })
+  chatRunSocket.on('connect_error', (err) => {
+    console.error('[ChatRun] Connect error:', err.message, 'url:', baseUrl)
+  })
+  chatRunSocket.io?.engine?.on?.('upgrade', (transport) => {
+    console.log('[ChatRun] Transport upgraded to:', transport?.name)
+  })
+
   // Register global listeners only once per socket connection
   if (!globalListenersRegistered) {
     // Message events
