@@ -1,6 +1,6 @@
 import { startRunViaSocket, resumeSession, registerSessionHandlers, unregisterSessionHandlers, getChatRunSocket, respondToolApproval, onPeerUserMessage, onSessionCommand, respondClarify, type RunEvent, type ResumeSessionPayload, type ContentBlock as ContentBlockImport } from '@/api/hermes/chat'
 import { deleteSession as deleteSessionApi, fetchSession, fetchSessions, setSessionModel, type HermesMessage, type SessionSummary } from '@/api/hermes/sessions'
-import { getActiveProfileName } from '@/api/client'
+import { getActiveProfileName, getBaseUrlValue } from '@/api/client'
 import { getDownloadUrl } from '@/api/hermes/download'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -124,7 +124,7 @@ async function uploadFiles(attachments: Attachment[]): Promise<{ name: string; p
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
   if (profileName) headers['X-Hermes-Profile'] = profileName
-  const res = await fetch('/upload', {
+  const res = await fetch(`${getBaseUrlValue()}/upload`, {
     method: 'POST',
     body: formData,
     headers,
@@ -510,14 +510,26 @@ export const useChatStore = defineStore('chat', () => {
   async function refreshActiveSession(): Promise<boolean> {
     const sid = activeSessionId.value
     if (!sid) return false
+    return refreshSessionFromServer(sid, activeSession.value?.profile)
+  }
+
+  async function refreshSessionFromServer(sessionId: string, profile?: string | null): Promise<boolean> {
     try {
-      const detail = await fetchSession(sid, activeSession.value?.profile)
+      const detail = await fetchSession(sessionId, profile)
       if (!detail) return false
-      const target = sessions.value.find(s => s.id === sid)
+      const target = sessions.value.find(s => s.id === sessionId)
       if (!target) return false
       const mapped = mapHermesMessages(detail.messages || [])
       target.messages = mapped
       if (detail.title) target.title = detail.title
+      target.messageCount = detail.message_count
+      target.inputTokens = detail.input_tokens
+      target.outputTokens = detail.output_tokens
+      target.provider = detail.provider || detail.billing_provider || target.provider
+      target.model = detail.model || target.model
+      target.endedAt = detail.ended_at != null ? Math.round(detail.ended_at * 1000) : target.endedAt
+      target.lastActiveAt = detail.last_active != null ? Math.round(detail.last_active * 1000) : target.lastActiveAt
+      if (activeSessionId.value === sessionId) activeSession.value = target
       return true
     } catch (err) {
       console.error('Failed to refresh active session:', err)
@@ -798,6 +810,14 @@ export const useChatStore = defineStore('chat', () => {
     if (idx !== -1) {
       s.messages[idx] = { ...s.messages[idx], ...update }
     }
+  }
+
+  function hasAssistantReplyAfter(sessionId: string, timestamp: number): boolean {
+    return getSessionMsgs(sessionId).some(m =>
+      m.role === 'assistant' &&
+      m.timestamp >= timestamp &&
+      (m.content.trim() || m.reasoning?.trim()),
+    )
   }
 
   function clearAgentEventMessages(sessionId: string) {
@@ -1385,6 +1405,30 @@ export const useChatStore = defineStore('chat', () => {
         serverWorking.value.delete(sid)
       }
 
+      const syncFinishedSession = () => {
+        window.setTimeout(() => {
+          const profile = sessions.value.find(s => s.id === sid)?.profile
+          void refreshSessionFromServer(sid, profile)
+        }, 300)
+      }
+
+      const scheduleMissingReplySync = () => {
+        for (const delay of [4000, 10000, 20000]) {
+          window.setTimeout(() => {
+            if (!sessions.value.some(s => s.id === sid)) return
+            if (hasAssistantReplyAfter(sid, userMsg.timestamp)) return
+            const profile = sessions.value.find(s => s.id === sid)?.profile
+            void refreshSessionFromServer(sid, profile).then((updated) => {
+              if (!updated) return
+              if (!hasAssistantReplyAfter(sid, userMsg.timestamp)) return
+              streamStates.value.delete(sid)
+              serverWorking.value.delete(sid)
+              updateSessionTitle(sid)
+            })
+          }, delay)
+        }
+      }
+
       // Per-active-run flags used to detect silently-swallowed errors at run.completed.
       // hermes-agent occasionally emits run.completed with empty output and no
       // usage when the agent layer caught an upstream error (e.g. invalid API
@@ -1873,6 +1917,7 @@ export const useChatStore = defineStore('chat', () => {
               } else {
                 cleanup()
               }
+              syncFinishedSession()
               activeAssistantMessageId = null
               updateSessionTitle(sid)
               break
@@ -1922,6 +1967,7 @@ export const useChatStore = defineStore('chat', () => {
             updateMessage(sid, last.id, { isStreaming: false })
           }
           cleanup()
+          syncFinishedSession()
           updateSessionTitle(sid)
         },
         // onError
@@ -1935,11 +1981,13 @@ export const useChatStore = defineStore('chat', () => {
             }
           })
           cleanup()
+          syncFinishedSession()
         },
         undefined,
         { onReconnectResume: applyReconnectResume },
       )
       runSubmitted = true
+      scheduleMissingReplySync()
 
       if (!isBridgeSlashCommand || isBridgeCompressCommand || isBridgePlanCommand || isBridgeGoalCommand) {
         streamStates.value.set(sid, ctrl)
