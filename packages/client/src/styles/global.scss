@@ -94,12 +94,28 @@ body {
   font-family: $font-ui;
   background-color: $bg-primary;
   color: $text-primary;
-  font-size: 14px;
-  line-height: 1.6;
+  
+  /* Android WebView text visibility fix */
+  -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
+/* Ensure message content is always visible */
+.conversation-monitor__message-content,
+.message-content,
+.msg-content {
+  color: var(--text-primary, #1a1a1a) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Dark mode override */
+.dark .conversation-monitor__message-content,
+.dark .message-content,
+.dark .msg-content {
+  color: var(--text-primary, #f0f0f0) !important;
+}
 
 
 code, pre, .mono {

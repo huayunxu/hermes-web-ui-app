@@ -21,6 +21,14 @@ import androidx.core.content.FileProvider;
 
 import com.getcapacitor.BridgeActivity;
 import android.webkit.WebView;
+import android.webkit.WebChromeClient;
+import android.webkit.PermissionRequest;
+import android.webkit.WebViewClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceError;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import org.json.JSONObject;
 
@@ -61,8 +69,34 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         // Enable WebView debugging for Chrome DevTools
         WebView.setWebContentsDebuggingEnabled(true);
+        
+        // Request microphone permission at runtime
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) 
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, 
+                new String[]{android.Manifest.permission.RECORD_AUDIO}, 1001);
+        }
+        
         // Check for updates after the app has started
         executor.execute(this::checkForUpdates);
+        
+        // Setup WebView with WebChromeClient for permission handling
+        // This is needed for Web Speech API (STT) to work on Android
+        try {
+            WebView webView = findViewById(com.getcapacitor.R.id.webview);
+            if (webView != null) {
+                webView.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onPermissionRequest(final PermissionRequest request) {
+                        runOnUiThread(() -> {
+                            request.grant(request.getResources());
+                        });
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to setup WebChromeClient: " + e.getMessage());
+        }
     }
 
     private void checkForUpdates() {
