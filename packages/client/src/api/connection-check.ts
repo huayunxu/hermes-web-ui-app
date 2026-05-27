@@ -1,5 +1,5 @@
 /**
- * Check if a server address is reachable via an HTTP HEAD request.
+ * Check if a server address is reachable via public health endpoints.
  * Returns the base URL if reachable, or null if not reachable within timeoutMs.
  */
 export async function checkAddressReachable(
@@ -10,30 +10,32 @@ export async function checkAddressReachable(
 
   // Normalize: strip trailing slash
   const base = address.replace(/\/+$/, '')
-  const healthUrl = `${base}/api/auth/status`
+  const healthPaths = ['/api/health', '/health']
 
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
+  for (const path of healthPaths) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-    const res = await fetch(healthUrl, {
-      method: 'HEAD',
-      signal: controller.signal,
-      // Avoid CORS preflight by keeping it simple
-      mode: 'cors',
-      cache: 'no-cache',
-    })
+      const res = await fetch(`${base}${path}`, {
+        method: 'GET',
+        signal: controller.signal,
+        // Avoid CORS preflight by keeping it simple
+        mode: 'cors',
+        cache: 'no-cache',
+      })
 
-    clearTimeout(timer)
+      clearTimeout(timer)
 
-    // Any response (even 4xx/5xx) means the server is reachable
-    if (res) {
-      return base
+      if (res.ok) {
+        return base
+      }
+    } catch {
+      // Try the next public health endpoint before declaring unreachable.
     }
-    return null
-  } catch {
-    return null
   }
+
+  return null
 }
 
 export interface AddressCheckResult {

@@ -1,29 +1,48 @@
-import { request } from './client'
+import { getBaseUrlValue, request } from './client'
 
 export interface AuthStatus {
   hasPasswordLogin: boolean
   hasUsers?: boolean
 }
 
+function authUrl(path: string): string {
+  return `${getBaseUrlValue()}${path}`
+}
+
+async function parseJsonResponse<T>(res: Response, fallbackMessage: string): Promise<T> {
+  const text = await res.text()
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(fallbackMessage)
+  }
+}
+
 export async function fetchAuthStatus(): Promise<AuthStatus> {
-  const res = await fetch('/api/auth/status')
+  const res = await fetch(authUrl('/api/auth/status'))
   if (!res.ok) throw new Error('Failed to fetch auth status')
-  return res.json()
+  return parseJsonResponse<AuthStatus>(res, 'Auth status endpoint returned a non-JSON response')
 }
 
 export async function loginWithPassword(username: string, password: string): Promise<string> {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(authUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   })
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
+    const data: { error?: string } = await parseJsonResponse<{ error?: string }>(
+      res,
+      'Login endpoint returned a non-JSON response',
+    ).catch(() => ({}))
     const err: any = new Error(data.error || 'Login failed')
     err.status = res.status
     throw err
   }
-  const data = await res.json()
+  const data = await parseJsonResponse<{ token: string }>(
+    res,
+    'Login endpoint returned a non-JSON response. Check that the server address points to Hermes Web UI.',
+  )
   return data.token
 }
 

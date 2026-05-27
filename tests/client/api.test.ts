@@ -12,7 +12,8 @@ vi.mock('@/router', () => ({
   },
 }))
 
-import { getApiKey, setApiKey, clearApiKey, hasApiKey, getStoredUserRole, isStoredSuperAdmin, request } from '../../packages/client/src/api/client'
+import { fetchAuthStatus, loginWithPassword } from '../../packages/client/src/api/auth'
+import { getApiKey, setApiKey, clearApiKey, hasApiKey, getStoredUserRole, isStoredSuperAdmin, request, setServerUrl } from '../../packages/client/src/api/client'
 import { getDownloadUrl } from '../../packages/client/src/api/hermes/download'
 import { uploadFiles } from '../../packages/client/src/api/hermes/files'
 import { batchDeleteSessions, importHermesSession } from '../../packages/client/src/api/hermes/sessions'
@@ -164,6 +165,50 @@ describe('API Client', () => {
 
       const result = await request('/api/hermes/sessions')
       expect(result).toEqual(data)
+    })
+  })
+
+  describe('auth API', () => {
+    it('uses the configured server URL for password login', async () => {
+      setServerUrl('http://10.1.1.50:80')
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"token":"session-token"}'),
+      })
+
+      const token = await loginWithPassword('admin', '123456')
+
+      expect(token).toBe('session-token')
+      const [url, options] = mockFetch.mock.calls[0]
+      expect(url).toBe('http://10.1.1.50:80/api/auth/login')
+      expect(options.method).toBe('POST')
+      expect(JSON.parse(options.body)).toEqual({ username: 'admin', password: '123456' })
+    })
+
+    it('uses the configured server URL for auth status', async () => {
+      setServerUrl('http://10.1.1.50:80')
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('{"hasPasswordLogin":true,"hasUsers":true}'),
+      })
+
+      const status = await fetchAuthStatus()
+
+      expect(status).toEqual({ hasPasswordLogin: true, hasUsers: true })
+      expect(mockFetch.mock.calls[0][0]).toBe('http://10.1.1.50:80/api/auth/status')
+    })
+
+    it('throws a readable error when login returns HTML', async () => {
+      setServerUrl('http://10.1.1.50:80')
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve('<!doctype html><html></html>'),
+      })
+
+      await expect(loginWithPassword('admin', '123456')).rejects.toThrow('Login endpoint returned a non-JSON response')
     })
   })
 
