@@ -84,7 +84,7 @@ jobs:
 
             ### Info
             - Commit: `${{ github.sha }}`
-            - Author: ${{ github.event.head_commit.author.name || 'Auto build' }}
+            - Author: Yvan Hu
             - Trigger: ${{ github.event_name }}
           files: |
             android/app/build/outputs/apk/debug/*.apk
